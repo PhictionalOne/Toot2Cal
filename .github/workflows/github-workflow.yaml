@@ -1,0 +1,73 @@
+name: Mastodon Posts to iCal
+
+on:
+  push:
+    branches: [ "master" ]
+  schedule:
+    - cron: '30 6 * * *'  # 8:30 UTC+2 (6:30 UTC)
+  workflow_dispatch:  # Allow manual triggering
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  PYTHON_VERSION: 3.9
+
+jobs:
+  generate-ical:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+      
+    - name: Generate Mastodon iCal
+      env:
+        MASTODON_ACCESS_TOKEN: ${{ secrets.MASTODON_ACCESS_TOKEN }}
+        MASTODON_INSTANCE_URL: ${{ secrets.MASTODON_INSTANCE_URL }}
+        TARGET_USERNAME: ${{ vars.TARGET_MASTODON_USERNAME }}
+        ICAL_INPUT: ${{ vars.ICAL_INPUT }}
+        ICAL_TARGET: ${{ vars.ICAL_TARGET }}
+        PREFIX: ${{ vars.PREFIX }}
+        DESCRIPTION: ${{ vars.DESCRIPTION }}
+      run: |
+        python mastodon-ical.py \
+          --token "$MASTODON_ACCESS_TOKEN" \
+          --instance "$MASTODON_INSTANCE_URL" \
+          --username "$TARGET_USERNAME" \
+          --input "$ICAL_INPUT" \
+          --output mastodon_posts.ics \
+          --prefix "$PREFIX" \
+          --description "$DESCRIPTION"
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: ./mastodon_posts.ics
+    
+    - name: Deploy to GitHub Pages
+      uses: actions/deploy-pages@v3
+    
+      #   - name: Commit and Push iCal if Changed
+      #     run: |
+      #       git config user.name github-actions
+      #       git config user.email github-actions@github.com
+      #       git add mastodon_posts.ics
+      #       git diff --quiet && git diff --staged --quiet || git commit -m "Update Mastodon Posts iCal"
+      #       git push
