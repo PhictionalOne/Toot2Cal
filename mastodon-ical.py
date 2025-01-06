@@ -6,7 +6,7 @@ import sys
 
 import requests
 from ics import Calendar, Event
-from mastodon import Mastodon
+from mastodon import Mastodon, MastodonNetworkError
 
 
 def remote_path_exists(url):
@@ -54,10 +54,12 @@ def convert_mastodon_to_ical(
         # Create calendar
         cal = Calendar()
         if os.path.exists(input_file):
+            print("Load Calendar from File")
             with open(input_file, "r") as f:
                 cal = Calendar(f.read())
-        elif remote_path_exists(input_file):
-            cal = Calendar(requests.get(input_file).text)
+        # elif remote_path_exists(input_file):
+        #     print("Load Calendar from Web")
+        #     cal = Calendar(requests.get(input_file).text)
 
         last_id = max(
             [re.findall(r"/([0-9]+)$", e.url)[0] for e in cal.events if e.url],
@@ -131,6 +133,9 @@ def convert_mastodon_to_ical(
         print(
             f"Created iCal file with {len(cal.events)} events at {output_file} from {len(posts)} posts"
         )
+
+    except MastodonNetworkError as e:
+        print(f"Network error: {e}")
 
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
